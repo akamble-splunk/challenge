@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -17,7 +16,7 @@ import (
 )
 
 func createNamespace(cs *kubernetes.Clientset, namespace string) {
-	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "user-akamble"}}
+	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 	n, err := cs.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println("failed to create ns")
@@ -30,7 +29,7 @@ func createPod(cs *kubernetes.Clientset, podName, namespace string) {
 	podSpec := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello-world",
-			Namespace: "maestro-developers",
+			Namespace: namespace,
 			Labels: map[string]string{
 				"k8s-app": "kube-dns",
 			},
@@ -45,7 +44,7 @@ func createPod(cs *kubernetes.Clientset, podName, namespace string) {
 		},
 	}
 
-	p, err := cs.CoreV1().Pods("maestro-developers").Create(context.TODO(), podSpec, metav1.CreateOptions{})
+	p, err := cs.CoreV1().Pods(namespace).Create(context.TODO(), podSpec, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println("failed to create pod")
 		panic(err.Error())
@@ -54,6 +53,7 @@ func createPod(cs *kubernetes.Clientset, podName, namespace string) {
 }
 
 func listPods(cs *kubernetes.Clientset, namespace, labelSelector string) {
+	fmt.Println("listing pods.....")
 	pods, err := cs.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		fmt.Println("failed to list pods with dns selector")
@@ -62,7 +62,7 @@ func listPods(cs *kubernetes.Clientset, namespace, labelSelector string) {
 	for _, pod := range pods.Items {
 		fmt.Println(pod.Name)
 	}
-	fmt.Println("listed pods successfully", pods)
+	fmt.Println("listed pods successfully")
 }
 
 func deletePod(cs *kubernetes.Clientset, namespace, name string) {
@@ -89,12 +89,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	cmd := &cobra.Command{
-		Use:   "challenge",
-		Short: "utility to list/create namespace and create/list/delete pods in a k8s cluster",
-	}
-	fs := cmd.Flags()
-	fs.StringVar(&namespace, "namespace", "maestro-developers", "namespace to create & to create pods in")
+	flag.StringVar(&namespace, "namespace", "challenge-ns", "namespace to create & to create pods in")
 
 	flag.Parse()
 	// create the k8s clientset
@@ -108,14 +103,14 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("There are %d namespaces in the cluster\n", len(namespaces.Items))
+	fmt.Printf("There are %d namespaces in the cluster; listing....\n", len(namespaces.Items))
 
 	for _, ns := range namespaces.Items {
 		fmt.Println(ns.Name)
 	}
 
 	// Create namespace
-	//createNamespace(clientset, namespace)
+	createNamespace(clientset, namespace)
 
 	// Create pod
 	createPod(clientset, "hello-world", namespace)
@@ -124,6 +119,6 @@ func main() {
 	listPods(clientset, namespace, "k8s-app=kube-dns")
 
 	// Delete Pod
-	//deletePod(clientset, namespace, "hello-world")
+	deletePod(clientset, namespace, "hello-world")
 
 }
